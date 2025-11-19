@@ -231,6 +231,9 @@ async function loadSettings() {
   state.telegramPushSummary = s.telegram.push_summary !== false;
   const tgPushSummary = q('#tgPushSummary');
   if (tgPushSummary) tgPushSummary.checked = state.telegramPushSummary;
+  state.telegramFetchSummary = s.telegram.fetch_summary_enabled !== false;
+  const tgFetchSummary = q('#tgFetchSummary');
+  if (tgFetchSummary) tgFetchSummary.checked = state.telegramFetchSummary;
 
   // 企业微信配置
   q('#wecomEnabled').checked = !!s.wecom?.enabled;
@@ -239,9 +242,13 @@ async function loadSettings() {
   state.wecomPushSummary = s.wecom?.push_summary !== false;
   const wecomPushSummary = q('#wecomPushSummary');
   if (wecomPushSummary) wecomPushSummary.checked = state.wecomPushSummary;
+  state.wecomFetchSummary = s.wecom?.fetch_summary_enabled !== false;
+  const wecomFetchSummary = q('#wecomFetchSummary');
+  if (wecomFetchSummary) wecomFetchSummary.checked = state.wecomFetchSummary;
 
   q('#reportHourly').checked = !!(s.reports?.hourly_enabled);
   q('#reportDaily').checked = !!(s.reports?.daily_enabled);
+  q('#dailyReportTime').value = s.reports?.daily_report_time || '00:00';
   q('#reportTimeout').value = s.reports?.report_timeout_seconds ?? 60;
   q('#reportSystemPrompt').value = s.reports?.system_prompt || '';
   q('#reportUserPrompt').value = s.reports?.user_prompt_template || '';
@@ -300,16 +307,19 @@ function gatherSettingsFromForm() {
       chat_id: q('#tgChatId').value.trim(),
       push_mode: q('#tgPushMode')?.value || 'all',
       push_summary: q('#tgPushSummary')?.checked ?? true,
+      fetch_summary_enabled: q('#tgFetchSummary')?.checked ?? true,
     },
     wecom: {
       enabled: q('#wecomEnabled').checked,
       webhook_key: q('#wecomWebhookKey').value.trim() || '***',
       push_mode: q('#wecomPushMode')?.value || 'all',
       push_summary: q('#wecomPushSummary')?.checked ?? true,
+      fetch_summary_enabled: q('#wecomFetchSummary')?.checked ?? true,
     },
     reports: {
       hourly_enabled: q('#reportHourly').checked,
       daily_enabled: q('#reportDaily').checked,
+      daily_report_time: q('#dailyReportTime').value,
       report_timeout_seconds: reportTimeout,
       system_prompt: q('#reportSystemPrompt').value,
       user_prompt_template: q('#reportUserPrompt').value,

@@ -47,6 +47,7 @@ class SettingsTelegram(BaseModel):
     chat_id: str = ""
     push_mode: Literal["all", "article_only", "report_only"] = "all"
     push_summary: bool = True
+    fetch_summary_enabled: bool = True  # 新增字段，控制是否推送抓取汇总
 
     @model_validator(mode="before")
     @classmethod
@@ -70,11 +71,13 @@ class SettingsWeCom(BaseModel):
     webhook_key: str = ""
     push_mode: Literal["all", "article_only", "report_only"] = "all"
     push_summary: bool = True
+    fetch_summary_enabled: bool = True  # 新增字段，控制是否推送抓取汇总
 
 
 class SettingsReports(BaseModel):
     daily_enabled: bool = False
     hourly_enabled: bool = False
+    daily_report_time: str = "00:00"  # 新增字段，格式为"HH:MM"
     report_timeout_seconds: int = Field(60, ge=10, le=300)
     system_prompt: str = (
         "你是一名资深中文资讯编辑，需要汇总给定时间范围内的RSS内容。"

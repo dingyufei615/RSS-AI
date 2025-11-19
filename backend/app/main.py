@@ -102,9 +102,20 @@ def _next_top_of_hour(now: datetime) -> datetime:
     return aligned.astimezone(timezone.utc)
 
 
-def _next_midnight(now: datetime) -> datetime:
+def _next_midnight(now: datetime, report_time: str = "00:00") -> datetime:
     local = now.astimezone(BEIJING_TZ)
-    aligned = local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 解析自定义时间
+    try:
+        hour, minute = map(int, report_time.split(":"))
+        # 确保时间在有效范围内
+        hour = max(0, min(23, hour))
+        minute = max(0, min(59, minute))
+    except:
+        # 如果解析失败，使用默认时间00:00
+        hour, minute = 0, 0
+
+    aligned = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if local >= aligned:
         aligned += timedelta(days=1)
     return aligned.astimezone(timezone.utc)
@@ -146,7 +157,10 @@ def _configure_report_schedulers(settings: AppSettings):
                 del _report_schedulers[report_type]
 
     ensure_scheduler("hourly", settings.reports.hourly_enabled, _next_top_of_hour)
-    ensure_scheduler("daily", settings.reports.daily_enabled, _next_midnight)
+    # 为日报调度器创建一个带有自定义时间的计算函数
+    def _next_daily_with_custom_time(now: datetime) -> datetime:
+        return _next_midnight(now, settings.reports.daily_report_time)
+    ensure_scheduler("daily", settings.reports.daily_enabled, _next_daily_with_custom_time)
 
 
 def _manual_report_timeframe(report_type: str) -> Tuple[datetime, datetime]:
@@ -224,12 +238,14 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
     tg_push_articles = tg_push_mode in ("all", "article_only")
     tg_push_reports = tg_push_mode in ("all", "report_only")
     tg_push_summary_enabled = getattr(settings.telegram, "push_summary", True)
+    tg_fetch_summary_enabled = getattr(settings.telegram, "fetch_summary_enabled", True)
 
     # WeCom push settings
     wecom_push_mode = getattr(settings.wecom, "push_mode", "all")
     wecom_push_articles = wecom_push_mode in ("all", "article_only")
     wecom_push_reports = wecom_push_mode in ("all", "report_only")
     wecom_push_summary_enabled = getattr(settings.wecom, "push_summary", True)
+    wecom_fetch_summary_enabled = getattr(settings.wecom, "fetch_summary_enabled", True)
 
     new_items = 0
     processed = 0
@@ -374,7 +390,7 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
         logging.info(f"汇总 {feed}: 新增 {new_items}，重复 {dup}，本次处理 {len(entries)} 条")
         duplicates += dup
     # 抓取汇总后报告到 Telegram（可选）
-    if tg is not None and tg_push_reports and tg_push_summary_enabled:
+    if tg is not None and tg_push_reports and tg_push_summary_enabled and tg_fetch_summary_enabled:
         summary_lines = [
             "<b>RSS-AI 抓取汇总</b>",
             f"RSS 源：{feeds_count} 个",
@@ -397,7 +413,7 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
         tg.send_message(settings.telegram.chat_id, "\n".join(summary_lines), parse_mode="HTML", disable_web_page_preview=True)
 
     # 抓取汇总后报告到企业微信（可选）
-    if wecom is not None and wecom_push_reports and wecom_push_summary_enabled:
+    if wecom is not None and wecom_push_reports and wecom_push_summary_enabled and wecom_fetch_summary_enabled:
         summary_lines = [
             "**RSS-AI 抓取汇总**",
             f"RSS 源：{feeds_count} 个",

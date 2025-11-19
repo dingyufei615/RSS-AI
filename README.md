@@ -216,16 +216,19 @@ telegram:
   chat_id: "@your_channel_or_chat_id"
   push_mode: all        # 推送内容：all=全部推送、article_only=只推送文章、report_only=只推送定时汇总
   push_summary: true    # 抓取完成后是否推送统计汇总消息
+  fetch_summary_enabled: true  # 是否推送抓取汇总统计消息
 
 wecom:
   enabled: false
   webhook_key: YOUR_WECOM_WEBHOOK_KEY
   push_mode: all        # 推送内容：all=全部推送、article_only=只推送文章、report_only=只推送定时汇总
   push_summary: true    # 抓取完成后是否推送统计汇总消息
+  fetch_summary_enabled: true  # 是否推送抓取汇总统计消息
 
 reports:
   daily_enabled: true             # 是否生成每日汇总报告
   hourly_enabled: true            # 是否生成每小时汇总报告
+  daily_report_time: "00:00"      # 日报推送时间（格式：HH:MM）
   report_timeout_seconds: 60      # 生成报告时的 AI 请求超时时间（秒）
   system_prompt: "..."            # 报告生成的系统提示词，可按需调整
   user_prompt_template: "..."     # 报告生成的用户提示词模板，可使用 {label}/{timeframe}/{article_count} 等占位符
@@ -242,9 +245,12 @@ logging:
 - 前端“设置”页支持在线更新以上配置。为安全起见，`api_key`、`bot_token` 和 `webhook_key` 在界面不回显；若不修改请留空，后端会保留旧值。
 - `telegram.push_mode` 控制推送范围：`all` 为发送文章和定时汇总，`article_only` 仅推送文章，`report_only` 仅推送定时汇总。
 - `telegram.push_summary` 控制抓取流程结束后是否推送统计汇总消息。
+- `telegram.fetch_summary_enabled` 控制是否推送抓取汇总统计消息。
 - `wecom.push_mode` 控制企业微信推送范围：`all` 为发送文章和定时汇总，`article_only` 仅推送文章，`report_only` 仅推送定时汇总。
 - `wecom.push_summary` 控制抓取流程结束后是否推送统计汇总消息。
+- `wecom.fetch_summary_enabled` 控制是否推送抓取汇总统计消息。
 - 报告任务可通过 `reports` 模块配置是否启用每日/每小时汇总，并自定义提示词模板；生成的报告同样会写入数据库与日志，便于二次处理或对接其他通知渠道。
+- 日报推送时间可通过 `reports.daily_report_time` 配置项自定义，默认为 "00:00"（午夜），格式为 "HH:MM"。
 - 自定义提示词：
   - System Prompt 与 User Prompt 模板均可在前端“AI 设置”中修改并保存。
   - 若模板中需要字面量大括号，请使用双大括号进行转义，例如 `{{` 与 `}}`。

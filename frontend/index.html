@@ -165,6 +165,10 @@
             <input type="checkbox" id="tgPushSummary" />
             <span>抓取完成后推送统计汇总</span>
           </label>
+          <label class="switch">
+            <input type="checkbox" id="tgFetchSummary" />
+            <span>推送抓取汇总统计</span>
+          </label>
           </fieldset>
 
           <fieldset>
@@ -190,6 +194,10 @@
               <input type="checkbox" id="wecomPushSummary" />
               <span>抓取完成后推送统计汇总</span>
             </label>
+            <label class="switch">
+              <input type="checkbox" id="wecomFetchSummary" />
+              <span>推送抓取汇总统计</span>
+            </label>
           </fieldset>
 
           <fieldset>
@@ -200,7 +208,11 @@
             </label>
             <label class="switch">
               <input type="checkbox" id="reportDaily" />
-              <span>启用日报（每日00:00，覆盖过去24小时）</span>
+              <span>启用日报（每日指定时间，覆盖过去24小时）</span>
+            </label>
+            <label>
+              日报推送时间
+              <input type="time" id="dailyReportTime" value="00:00" />
             </label>
             <label>
               报告 AI 超时时间（秒）
