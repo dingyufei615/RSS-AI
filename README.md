@@ -180,23 +180,23 @@ server:
   port: 3601
 
 fetch:
-  interval_minutes: 10   # 抓取间隔（分钟）
-  max_items: 500         # 存储上限（总条数）
+  interval_minutes: 10   # 抓取间隔（分钟），范围 1-1440
+  max_items: 500         # 存储上限（总条数），范围 10-50000
   feeds:                 # RSS 列表
     - https://hnrss.org/frontpage
   filter_keywords:       # 关键词列表，命中后才会入库/推送，可留空；英文匹配区分大小写
     - 人工智能
     - Generative AI
   use_article_page: true # 抓取原文网页并抽取正文后再送AI
-  article_timeout_seconds: 15
-  per_feed_limit: 20     # 单个RSS源每次抓取的最大条数（按时间倒序优先）
+  article_timeout_seconds: 15  # 原文抓取超时时间（秒），范围 5-60
+  per_feed_limit: 20     # 单个RSS源每次抓取的最大条数（按时间倒序优先），范围 1-1000
 
 ai:                      # OpenAI 通用格式
   enabled: true
   base_url: https://api.openai.com/v1   # 可填 https://api.openai.com 或 https://api.openai.com/v1，二者均兼容
   api_key: YOUR_API_KEY
   model: gpt-4o-mini
-  temperature: 0.2
+  temperature: 0.2       # AI温度参数，范围 0-1
   timeout_seconds: 30     # 单次AI请求超时（秒），范围 5-300，可根据模型响应速度调整
   system_prompt: |
     你是一个中文内容编辑助手。请对RSS文章进行信息抽取与高质量中文摘要，并输出严格的JSON对象，字段必须为：title, link, pubDate, author, summary_text。其中：title为原文标题或优化后的标题；link为原始URL；pubDate为发布时间（原文给出即可）；author为作者（若未知可留空字符串）；summary_text为简洁、条理清晰的段落式中文总结。务必只输出JSON，不要任何解释或markdown。
@@ -229,9 +229,9 @@ reports:
   daily_enabled: true             # 是否生成每日汇总报告
   hourly_enabled: true            # 是否生成每小时汇总报告
   daily_report_time: "00:00"      # 日报推送时间（格式：HH:MM）
-  report_timeout_seconds: 60      # 生成报告时的 AI 请求超时时间（秒）
+  report_timeout_seconds: 60      # 生成报告时的 AI 请求超时时间（秒），范围 10-300
   system_prompt: "..."            # 报告生成的系统提示词，可按需调整
-  user_prompt_template: "..."     # 报告生成的用户提示词模板，可使用 {label}/{timeframe}/{article_count} 等占位符
+  user_prompt_template: "..."     # 报告生成的用户提示词模板，可使用 {label}/{timeframe}/{article_count}/{feed_stats}/{article_details} 等占位符
 
 security:
   admin_password: "1234"   # 前端保存设置所需的 4 位数字密码，可在界面上输入旧密码后更新
@@ -251,8 +251,10 @@ logging:
 - `wecom.fetch_summary_enabled` 控制是否推送抓取汇总统计消息。
 - 报告任务可通过 `reports` 模块配置是否启用每日/每小时汇总，并自定义提示词模板；生成的报告同样会写入数据库与日志，便于二次处理或对接其他通知渠道。
 - 日报推送时间可通过 `reports.daily_report_time` 配置项自定义，默认为 "00:00"（午夜），格式为 "HH:MM"。
+- `reports.report_timeout_seconds` 控制生成报告时的 AI 请求超时时间，范围为 10-300 秒。
 - 自定义提示词：
-  - System Prompt 与 User Prompt 模板均可在前端“AI 设置”中修改并保存。
+  - System Prompt 与 User Prompt 模板均可在前端“AI 设置”和“定时汇总报告”设置中修改并保存。
+  - 报告的 User Prompt 模板可使用以下占位符：`{label}`（报告类型）、`{timeframe}`（时间范围）、`{article_count}`（文章总数）、`{feed_stats}`（来源统计）、`{article_details}`（文章详情）。
   - 若模板中需要字面量大括号，请使用双大括号进行转义，例如 `{{` 与 `}}`。
 
 ### 正文抽取说明
