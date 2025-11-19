@@ -10,6 +10,7 @@ from .ai_client import AIClient
 from .models import AppSettings, ReportCreate, SettingsReports
 from .storage import insert_report, list_articles_in_range
 from .telegram_client import TelegramClient
+from .wecom_client import WeComClient
 
 
 UTC = timezone.utc
@@ -70,6 +71,7 @@ def generate_report(
     settings: AppSettings,
     ai_client: Optional[AIClient],
     telegram_client: Optional[TelegramClient],
+    wecom_client: Optional[WeComClient] = None,
     start_override: Optional[datetime] = None,
     end_override: Optional[datetime] = None,
 ) -> Optional[int]:
@@ -190,10 +192,15 @@ def generate_report(
         f"生成{label}完成：时间段 {timeframe_display}，文章 {article_count} 篇，ID={report_id}"
     )
 
-    push_mode = getattr(settings.telegram, "push_mode", "all")
-    push_reports = push_mode in ("all", "report_only")
+    # Telegram push settings
+    tg_push_mode = getattr(settings.telegram, "push_mode", "all")
+    tg_push_reports = tg_push_mode in ("all", "report_only")
 
-    if telegram_client is not None and settings.telegram.enabled and push_reports:
+    # WeCom push settings
+    wecom_push_mode = getattr(settings.wecom, "push_mode", "all")
+    wecom_push_reports = wecom_push_mode in ("all", "report_only")
+
+    if telegram_client is not None and settings.telegram.enabled and tg_push_reports:
         header = f"RSS-AI {label}"
         body_lines = [
             header,
@@ -214,5 +221,23 @@ def generate_report(
             disable_web_page_preview=True,
         )
         logging.info(f"推送Telegram {label}：{'成功' if ok else '失败'}")
+
+    if wecom_client is not None and settings.wecom.enabled and wecom_push_reports:
+        header = f"RSS-AI {label}"
+        body_lines = [
+            header,
+            f"时间范围：{timeframe_display}",
+            f"文章总数：{article_count}",
+            "",
+            summary_text,
+        ]
+        message = "\n".join(body_lines)
+        # WeCom has a 4096 character limit
+        max_len = 4000
+        if len(message) > max_len:
+            message = message[: max_len - 3] + "..."
+            logging.warning("企业微信报告推送长度超限，已截断处理")
+        ok = wecom_client.send_message(message)
+        logging.info(f"推送企业微信 {label}：{'成功' if ok else '失败'}")
 
     return report_id

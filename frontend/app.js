@@ -26,6 +26,8 @@ let state = {
   reportGenerating: { hourly: false, daily: false },
   telegramPushMode: 'all',
   telegramPushSummary: true,
+  wecomPushMode: 'all',
+  wecomPushSummary: true,
 };
 
 function updateThemeToggle(theme) {
@@ -78,6 +80,19 @@ function updateTelegramPushModeUI(mode) {
   if (hidden) hidden.value = nextMode;
   qa('[data-push-mode]').forEach(btn => {
     const isActive = btn.dataset.pushMode === nextMode;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+}
+
+function updateWeComPushModeUI(mode) {
+  const validModes = ['all', 'article_only', 'report_only'];
+  const nextMode = validModes.includes(mode) ? mode : 'all';
+  state.wecomPushMode = nextMode;
+  const hidden = q('#wecomPushMode');
+  if (hidden) hidden.value = nextMode;
+  qa('[data-wecom-push-mode]').forEach(btn => {
+    const isActive = btn.dataset.wecomPushMode === nextMode;
     btn.classList.toggle('active', isActive);
     btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   });
@@ -217,6 +232,14 @@ async function loadSettings() {
   const tgPushSummary = q('#tgPushSummary');
   if (tgPushSummary) tgPushSummary.checked = state.telegramPushSummary;
 
+  // 企业微信配置
+  q('#wecomEnabled').checked = !!s.wecom?.enabled;
+  q('#wecomWebhookKey').value = ''; // 安全：不回显
+  updateWeComPushModeUI(s.wecom?.push_mode || 'all');
+  state.wecomPushSummary = s.wecom?.push_summary !== false;
+  const wecomPushSummary = q('#wecomPushSummary');
+  if (wecomPushSummary) wecomPushSummary.checked = state.wecomPushSummary;
+
   q('#reportHourly').checked = !!(s.reports?.hourly_enabled);
   q('#reportDaily').checked = !!(s.reports?.daily_enabled);
   q('#reportTimeout').value = s.reports?.report_timeout_seconds ?? 60;
@@ -277,6 +300,12 @@ function gatherSettingsFromForm() {
       chat_id: q('#tgChatId').value.trim(),
       push_mode: q('#tgPushMode')?.value || 'all',
       push_summary: q('#tgPushSummary')?.checked ?? true,
+    },
+    wecom: {
+      enabled: q('#wecomEnabled').checked,
+      webhook_key: q('#wecomWebhookKey').value.trim() || '***',
+      push_mode: q('#wecomPushMode')?.value || 'all',
+      push_summary: q('#wecomPushSummary')?.checked ?? true,
     },
     reports: {
       hourly_enabled: q('#reportHourly').checked,
@@ -565,6 +594,24 @@ function bindEvents() {
       state.telegramPushSummary = !!e.target.checked;
     });
   }
+
+  // 企业微信推送模式按钮事件处理
+  const wecomPushModeBtns = qa('[data-wecom-push-mode]');
+  if (wecomPushModeBtns.length) {
+    wecomPushModeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.wecomPushMode;
+        if (!mode || mode === state.wecomPushMode) return;
+        updateWeComPushModeUI(mode);
+      });
+    });
+  }
+  const wecomPushSummary = q('#wecomPushSummary');
+  if (wecomPushSummary) {
+    wecomPushSummary.addEventListener('change', (e) => {
+      state.wecomPushSummary = !!e.target.checked;
+    });
+  }
   const reportFilterBtns = qa('[data-report-filter]');
   if (reportFilterBtns.length) {
     reportFilterBtns.forEach(btn => {
@@ -607,6 +654,7 @@ function bindEvents() {
   }
 
   updateTelegramPushModeUI(state.telegramPushMode);
+  updateWeComPushModeUI(state.wecomPushMode);
 
   // 显示/隐藏返回顶部（移动端更友好）
   const onScroll = () => {

@@ -52,6 +52,11 @@ telegram:
   chat_id: "@your_channel_or_chat_id"
   push_mode: all
   push_summary: true
+wecom:
+  enabled: false
+  webhook_key: "YOUR_WECOM_WEBHOOK_KEY"
+  push_mode: all
+  push_summary: true
 reports:
   daily_enabled: true
   hourly_enabled: true

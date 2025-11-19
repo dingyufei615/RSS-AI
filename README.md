@@ -40,18 +40,19 @@
 - 去重与存储：使用 SQLite 本地存储，基于 `feed_url + item_uid` 唯一约束去重；可配置最大存储条数，自动裁剪旧数据。
 - 单源抓取上限：可为每个 RSS 源设置“单次抓取最多处理 N 条”，按时间倒序优先（越新越先处理）。
 - Telegram 推送：将 AI 总结以精简排版推送到指定群组或频道，支持单独控制文章推送与抓取汇总推送。
-- 抓取汇总推送（可选）：可将每次抓取的汇总信息（条目总数、入库成功/重复/失败、AI 调用成功/失败次数、Token 消耗等）推送到 Telegram，可在设置页一键关闭。
+- 企业微信推送：将 AI 总结以精简排版推送到企业微信群机器人，支持单独控制文章推送与抓取汇总推送。
+- 抓取汇总推送（可选）：可将每次抓取的汇总信息（条目总数、入库成功/重复/失败、AI 调用成功/失败次数、Token 消耗等）推送到 Telegram 或企业微信，可在设置页一键关闭。
 - 标准 API：提供 RESTful 接口与 `/docs` Swagger UI。
 - 前端管理：查看摘要列表、手动抓取、在线修改配置（无需重启服务）。
   - 可自定义提示词：支持自定义 System Prompt 与 User Prompt 模板（可用 {title}、{link}、{pub_date}、{author}、{content} 占位符）。
   - 支持设置 AI 调用超时，按需延长或收紧每次请求的最大等待时间。
-  - Telegram 设置页新增“抓取完成后推送统计汇总”开关，可按需关闭尾部汇总消息。
+  - Telegram 和企业微信设置页新增“抓取完成后推送统计汇总”开关，可按需关闭尾部汇总消息。
 - 安全校验：保存设置需输入 4 位数字管理密码（默认 `1234`，可在设置页通过旧密码更新）。
 
 ## 目录结构
 
 - `backend/` 后端源码与依赖
-  - `app/` FastAPI 应用、调度器、AI/Telegram/报告客户端、正文抽取、存储等模块（如 `main.py`、`scheduler.py`、`ai_client.py`、`report_service.py` 等）
+  - `app/` FastAPI 应用、调度器、AI/Telegram/企业微信/报告客户端、正文抽取、存储等模块（如 `main.py`、`scheduler.py`、`ai_client.py`、`report_service.py`、`wecom_client.py` 等）
   - `config.yaml` 运行时配置（仓库已提供一份可直接修改的默认配置）
   - `data/` SQLite 数据库存放目录
   - `logs/` 运行日志输出目录
@@ -69,7 +70,7 @@
 
 0) 安全事项
 
-- 在公网部署时请注意**不要公开后端端口3601**，（/api/config 会原样返回 API Key，且 CORS 允许任意来源代码在启动时将 CORS allow_origins=["*"]；同时 GET /api/config 直接回传完整配置（含 openai.api_key）。这意味着只要能访问到你的后端，任意站点都能读取到密钥（浏览器 CORS 放行））
+- 在公网部署时请注意**不要公开后端端口3601**，（/api/config 会原样返回 API Key 和 webhook key，且 CORS 允许任意来源代码在启动时将 CORS allow_origins=["*"]；同时 GET /api/config 直接回传完整配置（含 openai.api_key 和 wecom.webhook_key）。这意味着只要能访问到你的后端，任意站点都能读取到密钥（浏览器 CORS 放行））
 
 1) 准备环境
 
@@ -216,6 +217,12 @@ telegram:
   push_mode: all        # 推送内容：all=全部推送、article_only=只推送文章、report_only=只推送定时汇总
   push_summary: true    # 抓取完成后是否推送统计汇总消息
 
+wecom:
+  enabled: false
+  webhook_key: YOUR_WECOM_WEBHOOK_KEY
+  push_mode: all        # 推送内容：all=全部推送、article_only=只推送文章、report_only=只推送定时汇总
+  push_summary: true    # 抓取完成后是否推送统计汇总消息
+
 reports:
   daily_enabled: true             # 是否生成每日汇总报告
   hourly_enabled: true            # 是否生成每小时汇总报告
@@ -232,9 +239,11 @@ logging:
 ```
 
 - AI 接口为 OpenAI 兼容格式（`/v1/chat/completions`），你可替换 `base_url` 与 `model` 指向任意兼容服务。
-- 前端“设置”页支持在线更新以上配置。为安全起见，`api_key` 与 `bot_token` 在界面不回显；若不修改请留空，后端会保留旧值。
+- 前端“设置”页支持在线更新以上配置。为安全起见，`api_key`、`bot_token` 和 `webhook_key` 在界面不回显；若不修改请留空，后端会保留旧值。
 - `telegram.push_mode` 控制推送范围：`all` 为发送文章和定时汇总，`article_only` 仅推送文章，`report_only` 仅推送定时汇总。
 - `telegram.push_summary` 控制抓取流程结束后是否推送统计汇总消息。
+- `wecom.push_mode` 控制企业微信推送范围：`all` 为发送文章和定时汇总，`article_only` 仅推送文章，`report_only` 仅推送定时汇总。
+- `wecom.push_summary` 控制抓取流程结束后是否推送统计汇总消息。
 - 报告任务可通过 `reports` 模块配置是否启用每日/每小时汇总，并自定义提示词模板；生成的报告同样会写入数据库与日志，便于二次处理或对接其他通知渠道。
 - 自定义提示词：
   - System Prompt 与 User Prompt 模板均可在前端“AI 设置”中修改并保存。
@@ -268,6 +277,7 @@ logging:
   - 单源抓取上限：限制每次抓取时单个 RSS 源最多处理条数，按时间倒序优先（越新越先处理）。
   - 使用原文抽取正文 + 超时：先抓取原文网页并抽取正文，再交给 AI，总结质量更高；抽取失败则回退 RSS 摘要。
   - AI 提示词：内置默认 System Prompt 与 User Prompt 模板（已预填）；你可以直接微调而无需从零编写。
+  - 企业微信推送配置：可以在设置页配置企业微信 webhook key 和推送选项，支持选择推送模式和是否推送统计汇总消息。
 
 ## 运行日志
 
@@ -281,6 +291,6 @@ logging:
 
 ## 注意事项
 
-- 首次运行前请在配置中填入有效的 AI `api_key` 与 `base_url`/`model`，以及 Telegram `bot_token` 与 `chat_id`（可选）。
-- 网络环境受限时（例如公司内网），前端可本地打开使用；后端需要能访问 RSS、AI 接口与 Telegram。
+- 首次运行前请在配置中填入有效的 AI `api_key` 与 `base_url`/`model`，以及 Telegram `bot_token` 与 `chat_id`（可选）或企业微信 `webhook_key`（可选）。
+- 网络环境受限时（例如公司内网），前端可本地打开使用；后端需要能访问 RSS、AI 接口、Telegram 和企业微信。
 - 本项目以稳定、可维护为目标，尽量减少外部依赖（存储使用 SQLite，调度器为内置线程）。

@@ -37,6 +37,7 @@ from .rss_service import fetch_feed
 from .extractor import extract_from_url
 from .ai_client import AIClient, fallback_summary
 from .telegram_client import TelegramClient
+from .wecom_client import WeComClient
 from .scheduler import FetchScheduler, AlignedScheduler
 from .report_service import generate_report as run_report, BEIJING_TZ
 
@@ -87,6 +88,12 @@ def _build_telegram_client(settings: AppSettings) -> Optional[TelegramClient]:
     return None
 
 
+def _build_wecom_client(settings: AppSettings) -> Optional[WeComClient]:
+    if settings.wecom.enabled and settings.wecom.webhook_key:
+        return WeComClient(webhook_key=settings.wecom.webhook_key)
+    return None
+
+
 def _next_top_of_hour(now: datetime) -> datetime:
     local = now.astimezone(BEIJING_TZ)
     aligned = local.replace(minute=0, second=0, microsecond=0)
@@ -113,7 +120,8 @@ def _run_report(report_type: str):
         return
     ai = _build_ai_client(settings)
     tg = _build_telegram_client(settings)
-    run_report(report_type, settings=settings, ai_client=ai, telegram_client=tg)
+    wecom = _build_wecom_client(settings)
+    run_report(report_type, settings=settings, ai_client=ai, telegram_client=tg, wecom_client=wecom)
 
 
 def _configure_report_schedulers(settings: AppSettings):
@@ -183,14 +191,45 @@ def _format_telegram_message(item: dict, matched_keywords: Optional[list[str]] =
     return "\n".join(parts)
 
 
+def _format_wecom_message(item: dict, matched_keywords: Optional[list[str]] = None) -> str:
+    # item has title, link, pubDate, author, summary_text
+    title = item.get("title", "")
+    link = item.get("link", "")
+    pub_date = item.get("pubDate", "")
+    author = item.get("author", "")
+    summary_text = item.get("summary_text", "")
+    keywords = matched_keywords or []
+
+    # Create WeCom client to format message
+    # Note: This is a temporary client just for formatting, not for sending
+    temp_client = WeComClient("")
+    return temp_client.format_markdown_message(
+        title=title,
+        link=link,
+        pub_date=pub_date,
+        author=author,
+        summary_text=summary_text,
+        matched_keywords=keywords
+    )
+
+
 def do_fetch_once(force: bool = False) -> FetchResponse:
     settings = load_settings()
     ai = _build_ai_client(settings)
     tg = _build_telegram_client(settings)
-    push_mode = getattr(settings.telegram, "push_mode", "all")
-    push_articles = push_mode in ("all", "article_only")
-    push_reports = push_mode in ("all", "report_only")
-    push_summary_enabled = getattr(settings.telegram, "push_summary", True)
+    wecom = _build_wecom_client(settings)
+
+    # Telegram push settings
+    tg_push_mode = getattr(settings.telegram, "push_mode", "all")
+    tg_push_articles = tg_push_mode in ("all", "article_only")
+    tg_push_reports = tg_push_mode in ("all", "report_only")
+    tg_push_summary_enabled = getattr(settings.telegram, "push_summary", True)
+
+    # WeCom push settings
+    wecom_push_mode = getattr(settings.wecom, "push_mode", "all")
+    wecom_push_articles = wecom_push_mode in ("all", "article_only")
+    wecom_push_reports = wecom_push_mode in ("all", "report_only")
+    wecom_push_summary_enabled = getattr(settings.wecom, "push_summary", True)
 
     new_items = 0
     processed = 0
@@ -318,10 +357,15 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
                     logging.info(f"新文章入库: {article.title} ({row_id})")
                     prune_articles(settings.fetch.max_items)
                     # send to telegram
-                    if tg is not None and keywords_matched and push_articles:
+                    if tg is not None and keywords_matched and tg_push_articles:
                         text = _format_telegram_message(ai_obj, matched_keywords)
                         ok = tg.send_message(settings.telegram.chat_id, text, parse_mode="HTML", disable_web_page_preview=False)
                         logging.info(f"推送Telegram: {'成功' if ok else '失败'}")
+                    # send to wecom
+                    if wecom is not None and keywords_matched and wecom_push_articles:
+                        text = _format_wecom_message(ai_obj, matched_keywords)
+                        ok = wecom.send_message(text)
+                        logging.info(f"推送企业微信: {'成功' if ok else '失败'}")
                 else:
                     logging.debug(f"入库跳过或失败(可能重复): {article.title}")
             except Exception as ex:
@@ -330,7 +374,7 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
         logging.info(f"汇总 {feed}: 新增 {new_items}，重复 {dup}，本次处理 {len(entries)} 条")
         duplicates += dup
     # 抓取汇总后报告到 Telegram（可选）
-    if tg is not None and push_reports and push_summary_enabled:
+    if tg is not None and tg_push_reports and tg_push_summary_enabled:
         summary_lines = [
             "<b>RSS-AI 抓取汇总</b>",
             f"RSS 源：{feeds_count} 个",
@@ -351,6 +395,29 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
         if feed_fetch_failed:
             summary_lines.append(f"源抓取失败：{feed_fetch_failed} 个源")
         tg.send_message(settings.telegram.chat_id, "\n".join(summary_lines), parse_mode="HTML", disable_web_page_preview=True)
+
+    # 抓取汇总后报告到企业微信（可选）
+    if wecom is not None and wecom_push_reports and wecom_push_summary_enabled:
+        summary_lines = [
+            "**RSS-AI 抓取汇总**",
+            f"RSS 源：{feeds_count} 个",
+            f"获取条目：{processed} 条",
+            f"新增入库：{new_items} 条",
+            f"重复跳过：{duplicates} 条",
+            f"处理失败：{failed_items} 条",
+        ]
+        if ai is not None:
+            summary_lines.extend([
+                f"AI 调用：{ai_calls} 次（成功 {ai_success}，失败 {ai_failed}）",
+                f"Token 消耗：prompt {tokens_prompt}，completion {tokens_completion}，total {tokens_total}",
+            ])
+        if filter_keywords:
+            summary_lines.append(
+                f"关键词匹配：{keyword_match_hits} 次，命中文章：{keyword_match_articles} 篇"
+            )
+        if feed_fetch_failed:
+            summary_lines.append(f"源抓取失败：{feed_fetch_failed} 个源")
+        wecom.send_message("\n".join(summary_lines))
 
     return FetchResponse(
         fetched_feeds=feeds_count,
@@ -400,6 +467,8 @@ def get_settings():
         safe.ai.api_key = "***"
     if safe.telegram.bot_token:
         safe.telegram.bot_token = "***"
+    if safe.wecom.webhook_key:
+        safe.wecom.webhook_key = "***"
     if safe.security and safe.security.admin_password:
         safe.security.admin_password = ""
     # 为避免用户从零填写提示词，若为空则回填默认提示词
@@ -438,6 +507,8 @@ def update_settings(req: UpdateSettingsRequest):
         new_settings.ai.api_key = old.ai.api_key
     if new_settings.telegram.bot_token == "***":
         new_settings.telegram.bot_token = old.telegram.bot_token
+    if new_settings.wecom.webhook_key == "***":
+        new_settings.wecom.webhook_key = old.wecom.webhook_key
 
     if not (new_settings.ai.system_prompt and new_settings.ai.system_prompt.strip()):
         new_settings.ai.system_prompt = defaults.ai.system_prompt
@@ -511,11 +582,13 @@ def api_generate_report(req: ReportGenerateRequest):
     start_utc, end_utc = _manual_report_timeframe(report_type)
     ai = _build_ai_client(settings)
     tg = _build_telegram_client(settings)
+    wecom = _build_wecom_client(settings)
     report_id = run_report(
         report_type,
         settings=settings,
         ai_client=ai,
         telegram_client=tg,
+        wecom_client=wecom,
         start_override=start_utc,
         end_override=end_utc,
     )
