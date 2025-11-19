@@ -139,6 +139,18 @@ async function pushArticle(articleId, platforms) {
   }
 }
 
+async function pushReport(reportId, platforms) {
+  try {
+    const response = await api(`/api/reports/${reportId}/push`, {
+      method: 'POST',
+      body: JSON.stringify({ platforms })
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+}
+
 async function loadArticles() {
   showSkeleton(true);
   try {
@@ -490,6 +502,7 @@ function renderReports() {
       <div class="meta">类型：${typeLabel} · 时间范围：${escapeHtml(start)} ~ ${escapeHtml(end)} · 文章：${report.article_count}</div>
       <div class="summary">${escapeHtml(report.summary_text).replace(/\n/g,'<br/>')}</div>
       <div class="actions-row report-actions">
+        <button class="ghost" data-report-push="${report.id}">手动推送</button>
         <button class="ghost danger" data-report-delete="${report.id}">删除该报告</button>
       </div>
     `;
@@ -502,6 +515,14 @@ function renderReports() {
       const value = parseInt(btn.dataset.reportDelete, 10);
       if (Number.isNaN(value)) return;
       handleDeleteReport(value);
+    });
+  });
+  // 绑定报告推送按钮
+  qa('[data-report-push]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const reportId = parseInt(btn.dataset.reportPush, 10);
+      if (isNaN(reportId)) return;
+      showPushModal(null, reportId); // 传入reportId而不是articleId
     });
   });
 }
@@ -541,12 +562,18 @@ async function openModal(id) {
   } catch {}
 }
 
-function showPushModal(articleId) {
+function showPushModal(articleId, reportId = null) {
   const modal = q('#pushModal');
   if (!modal) return;
 
-  // 保存当前文章ID
-  modal.dataset.articleId = articleId;
+  // 保存当前ID和类型
+  if (articleId) {
+    modal.dataset.articleId = articleId;
+    modal.dataset.type = 'article';
+  } else if (reportId) {
+    modal.dataset.reportId = reportId;
+    modal.dataset.type = 'report';
+  }
 
   // 显示模态框
   modal.classList.add('show');
@@ -559,15 +586,24 @@ function closePushModal() {
     modal.classList.remove('show');
     document.body.classList.remove('modal-open');
     delete modal.dataset.articleId;
+    delete modal.dataset.reportId;
+    delete modal.dataset.type;
   }
 }
 
 async function handlePushConfirm() {
   const modal = q('#pushModal');
-  if (!modal || !modal.dataset.articleId) return;
+  if (!modal) return;
 
-  const articleId = parseInt(modal.dataset.articleId, 10);
-  if (isNaN(articleId)) return;
+  const type = modal.dataset.type || 'article';
+  let id;
+  if (type === 'article') {
+    id = parseInt(modal.dataset.articleId, 10);
+  } else if (type === 'report') {
+    id = parseInt(modal.dataset.reportId, 10);
+  }
+
+  if (isNaN(id)) return;
 
   const pushTelegram = q('#pushTelegram')?.checked;
   const pushWeCom = q('#pushWeCom')?.checked;
@@ -588,7 +624,12 @@ async function handlePushConfirm() {
     confirmBtn.textContent = '推送中...';
     confirmBtn.disabled = true;
 
-    const result = await pushArticle(articleId, platforms);
+    let result;
+    if (type === 'article') {
+      result = await pushArticle(id, platforms);
+    } else if (type === 'report') {
+      result = await pushReport(id, platforms);
+    }
 
     // 恢复按钮状态
     confirmBtn.textContent = originalText;

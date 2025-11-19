@@ -662,6 +662,83 @@ def api_generate_report(req: ReportGenerateRequest):
     return report
 
 
+@app.post("/api/reports/{report_id}/push")
+def api_push_report(report_id: int, req: ManualPushRequest):
+    # 获取报告
+    report = get_report(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    # 加载设置
+    settings = load_settings()
+
+    # 构建客户端
+    tg_client = _build_telegram_client(settings)
+    wecom_client = _build_wecom_client(settings)
+
+    # 转换报告数据为字典格式
+    report_dict = {
+        "title": report.title,
+        "summary_text": report.summary_text,
+        "timeframe_start": report.timeframe_start,
+        "timeframe_end": report.timeframe_end,
+        "article_count": report.article_count,
+    }
+
+    # 推送到指定平台
+    results = []
+
+    if "telegram" in req.platforms and tg_client and settings.telegram.enabled:
+        try:
+            # 格式化Telegram消息
+            header = f"RSS-AI {report.report_type}"
+            type_label = "日报" if report.report_type == "daily" else "小时报"
+            body_lines = [
+                header,
+                f"时间范围：{report.timeframe_start} ~ {report.timeframe_end}",
+                f"文章总数：{report.article_count}",
+                "",
+                report.summary_text,
+            ]
+            message = "\n".join(body_lines)
+            max_len = 3900
+            if len(message) > max_len:
+                message = message[: max_len - 3] + "..."
+            ok = tg_client.send_message(
+                settings.telegram.chat_id,
+                message,
+                parse_mode=None,
+                disable_web_page_preview=True,
+            )
+            results.append({"platform": "telegram", "success": ok, "message": "推送成功" if ok else "推送失败"})
+        except Exception as e:
+            results.append({"platform": "telegram", "success": False, "message": f"推送异常: {str(e)}"})
+
+    if "wecom" in req.platforms and wecom_client and settings.wecom.enabled:
+        try:
+            # 格式化企业微信消息
+            header = f"RSS-AI {report.report_type}"
+            type_label = "日报" if report.report_type == "daily" else "小时报"
+            body_lines = [
+                header,
+                f"时间范围：{report.timeframe_start} ~ {report.timeframe_end}",
+                f"文章总数：{report.article_count}",
+                "",
+                report.summary_text,
+            ]
+            message = "\n".join(body_lines)
+            # WeCom has a 4096 character limit
+            max_len = 4000
+            if len(message) > max_len:
+                message = message[: max_len - 3] + "..."
+            ok = wecom_client.send_message(message)
+            results.append({"platform": "wecom", "success": ok, "message": "推送成功" if ok else "推送失败"})
+        except Exception as e:
+            results.append({"platform": "wecom", "success": False, "message": f"推送异常: {str(e)}"})
+
+    return {"results": results}
+
+
 @app.delete("/api/reports/{report_id}", status_code=204)
 def api_delete_report(report_id: int):
     if not delete_report(report_id):
