@@ -150,7 +150,7 @@ def _configure_report_schedulers(settings: AppSettings):
                 )
                 _report_schedulers[report_type] = scheduler
                 # Generate once immediately for当前时间段
-                _run_report(report_type)
+                # _run_report(report_type)  # 注释掉这行以避免应用启动时立即生成报告
             scheduler.start()
         else:
             if scheduler is not None:
