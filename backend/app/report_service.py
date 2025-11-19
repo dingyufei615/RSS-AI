@@ -28,7 +28,7 @@ def _floor_to_day(dt: datetime) -> datetime:
 def _format_range_local(start: datetime, end: datetime) -> str:
     start_local = start.astimezone(BEIJING_TZ)
     end_local = end.astimezone(BEIJING_TZ)
-    return f"{start_local.strftime('%Y-%m-%d %H:%M')} - {end_local.strftime('%Y-%m-%d %H:%M')} 北京时间"
+    return f"{start_local.strftime('%Y-%m-%d %H:%M')} - {end_local.strftime('%Y-%m-%d %H:%M')}"
 
 
 def _fallback_report_summary(
