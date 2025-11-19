@@ -41,6 +41,30 @@ class SettingsAI(BaseModel):
     )
 
 
+class SettingsTelegram(BaseModel):
+    enabled: bool = False
+    bot_token: str = ""
+    chat_id: str = ""
+    push_mode: Literal["all", "article_only", "report_only"] = "all"
+    push_summary: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_push_mode(cls, values):
+        if isinstance(values, dict):
+            current = values.get("push_mode")
+            if current not in {"all", "article_only", "report_only"}:
+                if values.get("push_summary") is True:
+                    values["push_mode"] = "all"
+                elif values.get("push_summary") is False:
+                    values["push_mode"] = "article_only"
+                else:
+                    values["push_mode"] = "all"
+            if "push_summary" not in values:
+                values["push_summary"] = True
+        return values
+
+
 class SettingsWeCom(BaseModel):
     enabled: bool = False
     webhook_key: str = ""
