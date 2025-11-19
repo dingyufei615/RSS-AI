@@ -196,6 +196,10 @@ class FetchResponse(BaseModel):
     message: str = ""
 
 
+class ManualPushRequest(BaseModel):
+    platforms: List[Literal["telegram", "wecom"]] = Field(default_factory=list)
+
+
 class UpdateSettingsRequest(BaseModel):
     settings: AppSettings
     password: str

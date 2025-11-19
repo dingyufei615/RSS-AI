@@ -295,6 +295,33 @@
     </div>
   </div>
 
+  <!-- 推送模态框 -->
+  <div id="pushModal" class="modal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>手动推送文章</h3>
+        <button class="ghost" data-close-push="1">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>选择要推送的平台：</p>
+        <div class="checkbox-group">
+          <label class="checkbox">
+            <input type="checkbox" id="pushTelegram" checked>
+            <span>Telegram</span>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="pushWeCom" checked>
+            <span>企业微信</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" data-close-push="1">取消</button>
+        <button class="primary" id="confirmPush">推送</button>
+      </div>
+    </div>
+  </div>
+
   <script src="./app.js"></script>
   <script>
     const primaryTabs = Array.from(document.querySelectorAll('.primary-tab'));

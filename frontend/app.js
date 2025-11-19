@@ -126,6 +126,19 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
+
+async function pushArticle(articleId, platforms) {
+  try {
+    const response = await api(`/api/articles/${articleId}/push`, {
+      method: 'POST',
+      body: JSON.stringify({ platforms })
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+}
+
 async function loadArticles() {
   showSkeleton(true);
   try {
@@ -163,6 +176,7 @@ function renderArticles() {
       <div class="actions-row">
         <a class="link" target="_blank" rel="noopener" href="${item.link}">原文链接</a>
         <button class="ghost" data-copy="${item.link}">复制链接</button>
+        <button class="ghost" data-push="${item.id}">手动推送</button>
       </div>
     `;
     root.appendChild(el);
@@ -175,6 +189,15 @@ function renderArticles() {
     try { await navigator.clipboard.writeText(b.dataset.copy); toast('已复制链接'); } catch {}
   }));
   qa('.title.clickable').forEach(t => t.addEventListener('click', () => openModal(parseInt(t.dataset.id,10))));
+
+  // 绑定推送按钮
+  qa('[data-push]').forEach(b => b.addEventListener('click', async (e) => {
+    const articleId = parseInt(b.dataset.push, 10);
+    if (isNaN(articleId)) return;
+
+    // 显示推送选项模态框
+    showPushModal(articleId);
+  }));
 }
 
 function escapeHtml(s) {
@@ -518,7 +541,84 @@ async function openModal(id) {
   } catch {}
 }
 
-function closeModal(){ q('#modal').classList.remove('show'); document.body.classList.remove('modal-open'); }
+function showPushModal(articleId) {
+  const modal = q('#pushModal');
+  if (!modal) return;
+
+  // 保存当前文章ID
+  modal.dataset.articleId = articleId;
+
+  // 显示模态框
+  modal.classList.add('show');
+  document.body.classList.add('modal-open');
+}
+
+function closePushModal() {
+  const modal = q('#pushModal');
+  if (modal) {
+    modal.classList.remove('show');
+    document.body.classList.remove('modal-open');
+    delete modal.dataset.articleId;
+  }
+}
+
+async function handlePushConfirm() {
+  const modal = q('#pushModal');
+  if (!modal || !modal.dataset.articleId) return;
+
+  const articleId = parseInt(modal.dataset.articleId, 10);
+  if (isNaN(articleId)) return;
+
+  const pushTelegram = q('#pushTelegram')?.checked;
+  const pushWeCom = q('#pushWeCom')?.checked;
+
+  if (!pushTelegram && !pushWeCom) {
+    toast('请至少选择一个推送平台');
+    return;
+  }
+
+  const platforms = [];
+  if (pushTelegram) platforms.push('telegram');
+  if (pushWeCom) platforms.push('wecom');
+
+  try {
+    // 显示加载状态
+    const confirmBtn = q('#confirmPush');
+    const originalText = confirmBtn.textContent;
+    confirmBtn.textContent = '推送中...';
+    confirmBtn.disabled = true;
+
+    const result = await pushArticle(articleId, platforms);
+
+    // 恢复按钮状态
+    confirmBtn.textContent = originalText;
+    confirmBtn.disabled = false;
+
+    // 显示结果
+    const successCount = result.results.filter(r => r.success).length;
+    const totalCount = result.results.length;
+
+    if (successCount === totalCount) {
+      toast(`成功推送到 ${successCount}/${totalCount} 个平台`);
+    } else {
+      toast(`推送完成: ${successCount}/${totalCount} 个平台成功`);
+    }
+
+    // 关闭模态框
+    closePushModal();
+  } catch (error) {
+    console.error('推送失败:', error);
+
+    // 恢复按钮状态
+    const confirmBtn = q('#confirmPush');
+    if (confirmBtn) {
+      confirmBtn.textContent = '推送';
+      confirmBtn.disabled = false;
+    }
+
+    toast('推送失败: ' + (error.message || '未知错误'));
+  }
+}
 
 function bindEvents() {
   q('#refreshBtn').addEventListener('click', manualFetch);
@@ -665,6 +765,23 @@ function bindEvents() {
 
   updateTelegramPushModeUI(state.telegramPushMode);
   updateWeComPushModeUI(state.wecomPushMode);
+
+  // 推送模态框事件
+  const pushModal = q('#pushModal');
+  if (pushModal) {
+    // 关闭推送模态框事件
+    pushModal.addEventListener('click', (e) => {
+      if (e.target.id === 'pushModal' || e.target.dataset.closePush === '1') {
+        closePushModal();
+      }
+    });
+
+    // 确认推送按钮事件
+    const confirmPushBtn = q('#confirmPush');
+    if (confirmPushBtn) {
+      confirmPushBtn.addEventListener('click', handlePushConfirm);
+    }
+  }
 
   // 显示/隐藏返回顶部（移动端更友好）
   const onScroll = () => {
