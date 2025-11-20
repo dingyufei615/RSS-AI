@@ -176,8 +176,8 @@ docker compose down
 
 ```
 server:
-  host: 0.0.0.0
-  port: 3601
+  host: 0.0.0.0        # 服务器监听地址
+  port: 3601           # 服务器监听端口
 
 fetch:
   interval_minutes: 10   # 抓取间隔（分钟），范围 1-1440
@@ -237,8 +237,8 @@ security:
   admin_password: "1234"   # 前端保存设置所需的 4 位数字密码，可在界面上输入旧密码后更新
 
 logging:
-  level: INFO
-  file: logs/app.log
+  level: INFO              # 日志级别，可选：DEBUG, INFO, WARNING, ERROR
+  file: logs/app.log       # 日志文件路径
 ```
 
 - AI 接口为 OpenAI 兼容格式（`/v1/chat/completions`），你可替换 `base_url` 与 `model` 指向任意兼容服务。

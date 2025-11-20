@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time
 from typing import Dict, Optional, Tuple
 
 import uvicorn
@@ -228,8 +228,55 @@ def _format_wecom_message(item: dict, matched_keywords: Optional[list[str]] = No
     )
 
 
+def _is_do_not_disturb_time(settings: AppSettings) -> bool:
+    """
+    检查当前时间是否在勿扰时间段内
+    :param settings: 应用配置
+    :return: 如果在勿扰时间段内返回True，否则返回False
+    """
+    dnd_config = getattr(settings.fetch, 'do_not_disturb', None)
+    if not dnd_config:
+        return False
+
+    try:
+        # 解析勿扰时间配置，格式为 "HH:MM-HH:MM"
+        start_time_str, end_time_str = dnd_config.split('-')
+        start_hour, start_minute = map(int, start_time_str.split(':'))
+        end_hour, end_minute = map(int, end_time_str.split(':'))
+
+        # 创建时间对象
+        start_time = time(start_hour, start_minute)
+        end_time = time(end_hour, end_minute)
+
+        # 获取当前北京时间
+        now = datetime.now(BEIJING_TZ)
+        current_time = now.time()
+
+        # 检查是否在勿扰时间段内
+        if start_time <= end_time:
+            # 不跨天的情况，例如 22:00-08:00
+            return start_time <= current_time <= end_time
+        else:
+            # 跨天的情况，例如 22:00-08:00
+            return current_time >= start_time or current_time <= end_time
+    except Exception as e:
+        logging.warning(f"解析勿扰时间配置失败: {e}")
+        return False
+
+
 def do_fetch_once(force: bool = False) -> FetchResponse:
     settings = load_settings()
+
+    # 检查是否在勿扰时间段内（除非是强制抓取）
+    if not force and _is_do_not_disturb_time(settings):
+        logging.info("当前处于勿扰时间段，跳过RSS抓取")
+        return FetchResponse(
+            fetched_feeds=0,
+            new_items=0,
+            processed_items=0,
+            message="当前处于勿扰时间段，跳过RSS抓取",
+        )
+
     ai = _build_ai_client(settings)
     tg = _build_telegram_client(settings)
     wecom = _build_wecom_client(settings)

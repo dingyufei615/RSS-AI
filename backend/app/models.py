@@ -16,6 +16,8 @@ class SettingsFetch(BaseModel):
     use_article_page: bool = True
     article_timeout_seconds: int = Field(15, ge=5, le=60)
     per_feed_limit: int = Field(20, ge=1, le=1000)
+    # 勿扰时间设置，格式为 "HH:MM-HH:MM"，例如 "22:00-08:00"
+    do_not_disturb: Optional[str] = None
 
 
 class SettingsAI(BaseModel):

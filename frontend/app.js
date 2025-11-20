@@ -249,6 +249,7 @@ async function loadSettings() {
   q('#filterKeywords').value = state.filterKeywords.join('\n');
   q('#useArticlePage').checked = !!s.fetch.use_article_page;
   q('#articleTimeout').value = s.fetch.article_timeout_seconds ?? 15;
+  q('#doNotDisturb').value = s.fetch.do_not_disturb || '';
 
   q('#aiEnabled').checked = !!s.ai.enabled;
   q('#aiBaseUrl').value = s.ai.base_url || '';
@@ -325,6 +326,7 @@ function gatherSettingsFromForm() {
       filter_keywords: filterKeywords,
       use_article_page: q('#useArticlePage').checked,
       article_timeout_seconds: parseInt(q('#articleTimeout').value, 10),
+      do_not_disturb: q('#doNotDisturb').value.trim() || null,
     },
     ai: {
       enabled: q('#aiEnabled').checked,
