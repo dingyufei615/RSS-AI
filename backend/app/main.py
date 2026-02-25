@@ -4,6 +4,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone, time
 from typing import Dict, Optional, Tuple
+from urllib.parse import urlsplit, urlunsplit
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Response
@@ -92,7 +93,7 @@ def _build_telegram_client(settings: AppSettings) -> Optional[TelegramClient]:
 
 
 def _build_wecom_client(settings: AppSettings) -> Optional[WeComClient]:
-    key = _resolve_wecom_webhook_key(settings, None)
+    key, _ = _resolve_wecom_webhook_key(settings, None)
     if key:
         return WeComClient(webhook_key=key)
     return None
@@ -109,16 +110,41 @@ def _normalize_wecom_feed_webhooks(settings: AppSettings) -> Dict[str, str]:
     return cleaned
 
 
-def _resolve_wecom_webhook_key(settings: AppSettings, feed_url: Optional[str]) -> str:
-    if not settings.wecom.enabled:
+def _normalize_feed_url(feed_url: str) -> str:
+    raw = str(feed_url or "").strip()
+    if not raw:
         return ""
+    try:
+        parsed = urlsplit(raw)
+        scheme = parsed.scheme.lower()
+        netloc = parsed.netloc.lower()
+        path = parsed.path or ""
+        if path != "/":
+            path = path.rstrip("/")
+        return urlunsplit((scheme, netloc, path, parsed.query, ""))
+    except Exception:
+        return raw
+
+
+def _resolve_wecom_webhook_key(settings: AppSettings, feed_url: Optional[str]) -> Tuple[str, str]:
+    if not settings.wecom.enabled:
+        return "", "disabled"
+    feed_webhooks = _normalize_wecom_feed_webhooks(settings)
     if feed_url:
         feed = feed_url.strip()
         if feed:
-            feed_key = _normalize_wecom_feed_webhooks(settings).get(feed, "")
+            feed_key = feed_webhooks.get(feed, "")
             if feed_key:
-                return feed_key
-    return str(settings.wecom.webhook_key or "").strip()
+                return feed_key, "feed_exact"
+            normalized_feed = _normalize_feed_url(feed)
+            if normalized_feed:
+                for configured_feed, configured_key in feed_webhooks.items():
+                    if _normalize_feed_url(configured_feed) == normalized_feed:
+                        return configured_key, "feed_normalized"
+    default_key = str(settings.wecom.webhook_key or "").strip()
+    if default_key:
+        return default_key, "default"
+    return "", "none"
 
 
 def _build_wecom_client_for_feed(
@@ -126,9 +152,17 @@ def _build_wecom_client_for_feed(
     feed_url: Optional[str],
     cache: Dict[str, WeComClient],
 ) -> Optional[WeComClient]:
-    key = _resolve_wecom_webhook_key(settings, feed_url)
+    key, source = _resolve_wecom_webhook_key(settings, feed_url)
     if not key:
         return None
+    if feed_url:
+        key_tail = key[-6:] if len(key) > 6 else key
+        logging.info(
+            "企业微信机器人路由: feed=%s source=%s key_tail=%s",
+            feed_url,
+            source,
+            key_tail,
+        )
     if key not in cache:
         cache[key] = WeComClient(webhook_key=key)
     return cache[key]
