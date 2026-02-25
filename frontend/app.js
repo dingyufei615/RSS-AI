@@ -254,13 +254,15 @@ function parseWeComFeedWebhooks(text) {
   lines.forEach((line, index) => {
     const raw = line.trim();
     if (!raw) return;
-    const sep = raw.indexOf('|');
-    if (sep <= 0 || sep >= raw.length - 1) {
+    // 兼容中文输入法下的全角竖线“｜”
+    const normalized = raw.replace(/｜/g, '|');
+    const sep = normalized.indexOf('|');
+    if (sep <= 0 || sep >= normalized.length - 1) {
       invalidLines.push(index + 1);
       return;
     }
-    const feed = raw.slice(0, sep).trim();
-    const webhookKey = raw.slice(sep + 1).trim();
+    const feed = normalized.slice(0, sep).trim();
+    const webhookKey = normalized.slice(sep + 1).trim();
     if (!feed || !webhookKey) {
       invalidLines.push(index + 1);
       return;

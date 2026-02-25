@@ -20,6 +20,7 @@ services:
     environment:
       - PORT=3602
       - BACKEND_BASE_URL=http://backend:3601
+      - PROXY_TIMEOUT_SECONDS=180
       - TZ=Asia/Shanghai
     depends_on:
       - backend

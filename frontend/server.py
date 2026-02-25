@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 
 BACKEND_BASE = os.environ.get("BACKEND_BASE_URL", "http://127.0.0.1:3601").rstrip("/")
+PROXY_TIMEOUT_SECONDS = float(os.environ.get("PROXY_TIMEOUT_SECONDS", "180"))
 
 app = FastAPI(title="RSS-AI Frontend Server")
 
@@ -22,7 +23,7 @@ async def proxy_api(path: str, request: Request):
     # Avoid hop-by-hop headers
     for k in ["content-length", "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "transfer-encoding", "upgrade"]:
         headers.pop(k, None)
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=PROXY_TIMEOUT_SECONDS) as client:
         resp = await client.request(
             request.method,
             target,
@@ -49,4 +50,3 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", "3602"))
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
-
