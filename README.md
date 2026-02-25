@@ -221,6 +221,9 @@ telegram:
 wecom:
   enabled: false
   webhook_key: YOUR_WECOM_WEBHOOK_KEY
+  feed_webhooks:         # 可选：按源覆盖机器人（key=feed_url，value=webhook_key）
+    https://example.com/rss.xml: YOUR_WECOM_WEBHOOK_KEY_FOR_FEED_1
+    https://another.example.com/atom.xml: YOUR_WECOM_WEBHOOK_KEY_FOR_FEED_2
   push_mode: all        # 推送内容：all=全部推送、article_only=只推送文章、report_only=只推送定时汇总
   push_summary: true    # 抓取完成后是否推送统计汇总消息
   fetch_summary_enabled: true  # 是否推送抓取汇总统计消息
@@ -249,6 +252,8 @@ logging:
 - `wecom.push_mode` 控制企业微信推送范围：`all` 为发送文章和定时汇总，`article_only` 仅推送文章，`report_only` 仅推送定时汇总。
 - `wecom.push_summary` 控制抓取流程结束后是否推送统计汇总消息。
 - `wecom.fetch_summary_enabled` 控制是否推送抓取汇总统计消息。
+- `wecom.feed_webhooks` 可按 RSS 源覆盖企业微信机器人；未命中时回退使用 `wecom.webhook_key`。
+- 前端“企业微信推送”支持按行配置：`feed_url|webhook_key`。为安全起见，已保存的 key 会显示为 `***`，保存时会自动保留旧值。
 - 报告任务可通过 `reports` 模块配置是否启用每日/每小时汇总，并自定义提示词模板；生成的报告同样会写入数据库与日志，便于二次处理或对接其他通知渠道。
 - 日报推送时间可通过 `reports.daily_report_time` 配置项自定义，默认为 "00:00"（午夜），格式为 "HH:MM"。
 - `reports.report_timeout_seconds` 控制生成报告时的 AI 请求超时时间，范围为 10-300 秒。

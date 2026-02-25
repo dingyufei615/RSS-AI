@@ -237,6 +237,39 @@ async function manualFetch() {
   }
 }
 
+function formatWeComFeedWebhooks(feedWebhooks) {
+  if (!feedWebhooks || typeof feedWebhooks !== 'object') {
+    return '';
+  }
+  return Object.entries(feedWebhooks)
+    .filter(([feed, key]) => String(feed || '').trim() && String(key || '').trim())
+    .map(([feed, key]) => `${feed}|${key}`)
+    .join('\n');
+}
+
+function parseWeComFeedWebhooks(text) {
+  const result = {};
+  const invalidLines = [];
+  const lines = String(text || '').split('\n');
+  lines.forEach((line, index) => {
+    const raw = line.trim();
+    if (!raw) return;
+    const sep = raw.indexOf('|');
+    if (sep <= 0 || sep >= raw.length - 1) {
+      invalidLines.push(index + 1);
+      return;
+    }
+    const feed = raw.slice(0, sep).trim();
+    const webhookKey = raw.slice(sep + 1).trim();
+    if (!feed || !webhookKey) {
+      invalidLines.push(index + 1);
+      return;
+    }
+    result[feed] = webhookKey;
+  });
+  return { result, invalidLines };
+}
+
 async function clearArticlesByFeed() {
   const feed = (state.filterFeed || '').trim();
   if (!feed) {
@@ -317,6 +350,7 @@ async function loadSettings() {
   // 企业微信配置
   q('#wecomEnabled').checked = !!s.wecom?.enabled;
   q('#wecomWebhookKey').value = ''; // 安全：不回显
+  q('#wecomFeedWebhooks').value = formatWeComFeedWebhooks(s.wecom?.feed_webhooks || {});
   updateWeComPushModeUI(s.wecom?.push_mode || 'all');
   state.wecomPushSummary = s.wecom?.push_summary !== false;
   const wecomPushSummary = q('#wecomPushSummary');
@@ -347,6 +381,10 @@ function gatherSettingsFromForm() {
   const current = state.settings;
   const feeds = q('#feeds').value.split(/\n+/).map(s => s.trim()).filter(Boolean);
   const filterKeywords = q('#filterKeywords').value.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const wecomFeedWebhooksParsed = parseWeComFeedWebhooks(q('#wecomFeedWebhooks')?.value || '');
+  if (wecomFeedWebhooksParsed.invalidLines.length) {
+    throw new Error(`企业微信按源机器人格式错误，行号：${wecomFeedWebhooksParsed.invalidLines.join(', ')}（格式：feed_url|webhook_key）`);
+  }
   let reportTimeout = parseInt(q('#reportTimeout').value, 10);
   if (!Number.isFinite(reportTimeout)) {
     reportTimeout = 60;
@@ -392,6 +430,7 @@ function gatherSettingsFromForm() {
     wecom: {
       enabled: q('#wecomEnabled').checked,
       webhook_key: q('#wecomWebhookKey').value.trim() || '***',
+      feed_webhooks: wecomFeedWebhooksParsed.result,
       push_mode: q('#wecomPushMode')?.value || 'all',
       push_summary: q('#wecomPushSummary')?.checked ?? true,
       fetch_summary_enabled: q('#wecomFetchSummary')?.checked ?? true,

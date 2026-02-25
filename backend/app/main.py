@@ -92,9 +92,46 @@ def _build_telegram_client(settings: AppSettings) -> Optional[TelegramClient]:
 
 
 def _build_wecom_client(settings: AppSettings) -> Optional[WeComClient]:
-    if settings.wecom.enabled and settings.wecom.webhook_key:
-        return WeComClient(webhook_key=settings.wecom.webhook_key)
+    key = _resolve_wecom_webhook_key(settings, None)
+    if key:
+        return WeComClient(webhook_key=key)
     return None
+
+
+def _normalize_wecom_feed_webhooks(settings: AppSettings) -> Dict[str, str]:
+    raw = getattr(settings.wecom, "feed_webhooks", {}) or {}
+    cleaned: Dict[str, str] = {}
+    for feed_url, webhook_key in raw.items():
+        feed = str(feed_url or "").strip()
+        key = str(webhook_key or "").strip()
+        if feed and key:
+            cleaned[feed] = key
+    return cleaned
+
+
+def _resolve_wecom_webhook_key(settings: AppSettings, feed_url: Optional[str]) -> str:
+    if not settings.wecom.enabled:
+        return ""
+    if feed_url:
+        feed = feed_url.strip()
+        if feed:
+            feed_key = _normalize_wecom_feed_webhooks(settings).get(feed, "")
+            if feed_key:
+                return feed_key
+    return str(settings.wecom.webhook_key or "").strip()
+
+
+def _build_wecom_client_for_feed(
+    settings: AppSettings,
+    feed_url: Optional[str],
+    cache: Dict[str, WeComClient],
+) -> Optional[WeComClient]:
+    key = _resolve_wecom_webhook_key(settings, feed_url)
+    if not key:
+        return None
+    if key not in cache:
+        cache[key] = WeComClient(webhook_key=key)
+    return cache[key]
 
 
 def _next_top_of_hour(now: datetime) -> datetime:
@@ -282,6 +319,7 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
     ai = _build_ai_client(settings)
     tg = _build_telegram_client(settings)
     wecom = _build_wecom_client(settings)
+    wecom_clients_by_key: Dict[str, WeComClient] = {}
 
     # Telegram push settings
     tg_push_mode = getattr(settings.telegram, "push_mode", "all")
@@ -316,6 +354,7 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
     keyword_match_articles = 0
     for feed in settings.fetch.feeds:
         logging.info(f"开始抓取: {feed}")
+        wecom_for_feed = _build_wecom_client_for_feed(settings, feed, wecom_clients_by_key)
         try:
             entries = fetch_feed(feed)
         except Exception as e:
@@ -428,9 +467,9 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
                         ok = tg.send_message(settings.telegram.chat_id, text, parse_mode="HTML", disable_web_page_preview=False)
                         logging.info(f"推送Telegram: {'成功' if ok else '失败'}")
                     # send to wecom
-                    if wecom is not None and keywords_matched and wecom_push_articles:
+                    if wecom_for_feed is not None and keywords_matched and wecom_push_articles:
                         text = _format_wecom_message(ai_obj, matched_keywords)
-                        ok = wecom.send_message(text)
+                        ok = wecom_for_feed.send_message(text)
                         logging.info(f"推送企业微信: {'成功' if ok else '失败'}")
                 else:
                     logging.debug(f"入库跳过或失败(可能重复): {article.title}")
@@ -535,6 +574,12 @@ def get_settings():
         safe.telegram.bot_token = "***"
     if safe.wecom.webhook_key:
         safe.wecom.webhook_key = "***"
+    if getattr(safe.wecom, "feed_webhooks", None):
+        safe.wecom.feed_webhooks = {
+            str(feed_url): "***"
+            for feed_url, webhook_key in safe.wecom.feed_webhooks.items()
+            if str(feed_url).strip() and str(webhook_key).strip()
+        }
     if safe.security and safe.security.admin_password:
         safe.security.admin_password = ""
     # 为避免用户从零填写提示词，若为空则回填默认提示词
@@ -575,6 +620,27 @@ def update_settings(req: UpdateSettingsRequest):
         new_settings.telegram.bot_token = old.telegram.bot_token
     if new_settings.wecom.webhook_key == "***":
         new_settings.wecom.webhook_key = old.wecom.webhook_key
+    # feed_webhooks 支持使用 "***" 保留旧值；未显式传入该字段时保持旧配置
+    old_feed_webhooks = getattr(old.wecom, "feed_webhooks", {}) or {}
+    if "feed_webhooks" not in new_settings.wecom.model_fields_set:
+        new_settings.wecom.feed_webhooks = old_feed_webhooks
+    else:
+        merged_feed_webhooks: Dict[str, str] = {}
+        incoming_feed_webhooks = getattr(new_settings.wecom, "feed_webhooks", {}) or {}
+        for feed_url, webhook_key in incoming_feed_webhooks.items():
+            feed = str(feed_url or "").strip()
+            if not feed:
+                continue
+            key = str(webhook_key or "").strip()
+            if not key:
+                continue
+            if key == "***":
+                old_key = str(old_feed_webhooks.get(feed, "") or "").strip()
+                if old_key:
+                    merged_feed_webhooks[feed] = old_key
+                continue
+            merged_feed_webhooks[feed] = key
+        new_settings.wecom.feed_webhooks = merged_feed_webhooks
 
     if not (new_settings.ai.system_prompt and new_settings.ai.system_prompt.strip()):
         new_settings.ai.system_prompt = defaults.ai.system_prompt
@@ -658,7 +724,7 @@ def api_push_article(article_id: int, req: ManualPushRequest):
 
     # 构建客户端
     tg_client = _build_telegram_client(settings)
-    wecom_client = _build_wecom_client(settings)
+    wecom_client = _build_wecom_client_for_feed(settings, item.feed_url, {})
 
     # 转换文章数据为字典格式
     item_dict = {

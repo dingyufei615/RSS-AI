@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Literal
+from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 
@@ -71,6 +71,8 @@ class SettingsTelegram(BaseModel):
 class SettingsWeCom(BaseModel):
     enabled: bool = False
     webhook_key: str = ""
+    # 按源覆盖企业微信机器人，key 为 feed_url，value 为 webhook_key
+    feed_webhooks: Dict[str, str] = Field(default_factory=dict)
     push_mode: Literal["all", "article_only", "report_only"] = "all"
     push_summary: bool = True
     fetch_summary_enabled: bool = True  # 新增字段，控制是否推送抓取汇总
