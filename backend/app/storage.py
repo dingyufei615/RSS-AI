@@ -181,6 +181,15 @@ def prune_articles(max_items: int):
             )
 
 
+def delete_articles(feed_url: Optional[str] = None) -> int:
+    with _connect() as conn:
+        if feed_url:
+            cur = conn.execute("DELETE FROM articles WHERE feed_url = ?", (feed_url,))
+        else:
+            cur = conn.execute("DELETE FROM articles")
+        return max(0, int(cur.rowcount or 0))
+
+
 def list_articles_in_range(start: datetime, end: datetime) -> List[ArticleInDB]:
     start_str = start.strftime("%Y-%m-%d %H:%M:%S")
     end_str = end.strftime("%Y-%m-%d %H:%M:%S")

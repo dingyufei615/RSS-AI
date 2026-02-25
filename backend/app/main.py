@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import load_settings, save_settings
 from .models import (
     AppSettings,
+    ArticleDeleteResponse,
     ArticleInDB,
     ArticleListResponse,
     FetchRequest,
@@ -29,6 +30,7 @@ from .storage import (
     get_article,
     insert_article,
     prune_articles,
+    delete_articles,
     exists_article,
     list_reports,
     get_report,
@@ -631,6 +633,17 @@ def api_get_article(article_id: int):
     if not item:
         raise HTTPException(status_code=404, detail="Article not found")
     return item
+
+
+@app.delete("/api/articles", response_model=ArticleDeleteResponse)
+def api_delete_articles(feed: Optional[str] = Query(default=None, min_length=1, max_length=2048)):
+    feed_url = (feed or "").strip() or None
+    deleted = delete_articles(feed_url=feed_url)
+    return ArticleDeleteResponse(
+        deleted=deleted,
+        scope="feed" if feed_url else "all",
+        feed_url=feed_url,
+    )
 
 
 @app.post("/api/articles/{article_id}/push")

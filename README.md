@@ -271,6 +271,7 @@ logging:
 - `PUT /api/settings` 更新配置（支持热更新抓取间隔）
 - `POST /api/fetch` 立即抓取（可选 `{"force": false}`）
 - `GET /api/articles?limit=20&offset=0&feed=` 列表查询
+- `DELETE /api/articles?feed=` 删除文章（`feed` 为空时清空全部，非空时清空指定源）
 - `GET /api/articles/{id}` 文章详情
 
 完整接口文档请见 `:3601/docs`（Swagger UI）。

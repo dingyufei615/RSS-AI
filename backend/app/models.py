@@ -158,6 +158,12 @@ class ArticleListResponse(BaseModel):
     items: List[ArticleInDB]
 
 
+class ArticleDeleteResponse(BaseModel):
+    deleted: int
+    scope: Literal["all", "feed"]
+    feed_url: Optional[str] = None
+
+
 class ReportInDB(BaseModel):
     id: int
     report_type: str

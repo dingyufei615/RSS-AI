@@ -287,6 +287,8 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 .toolbar .row-actions #refreshBtn,
 .toolbar .row-actions .switch.as-btn,
+.toolbar .row-actions #clearCurrentFeedBtn,
+.toolbar .row-actions #clearAllArticlesBtn,
 .toolbar .row-actions #statusText { flex: 0 0 auto; white-space: nowrap; }
 #statusText { margin-left: auto; color: var(--muted); font-size: 12px; }
 
@@ -450,7 +452,9 @@ body.modal-open { overflow: hidden; }
   .toolbar .row1 #feedSelect { flex: 1 1 auto; max-width: none; min-width: 0; }
   .toolbar .row-search .search-wrapper { flex: 1 1 auto; min-width: 0; }
   .toolbar .row-actions #refreshBtn,
-  .toolbar .row-actions .switch.as-btn { flex: 0 0 auto; }
+  .toolbar .row-actions .switch.as-btn,
+  .toolbar .row-actions #clearCurrentFeedBtn,
+  .toolbar .row-actions #clearAllArticlesBtn { flex: 0 0 auto; }
   .toolbar .row-actions #statusText { margin-left: auto; text-align: right; font-size: 12px; }
   .search-wrapper { gap: 8px; }
   input, textarea, select { padding: 10px 12px; font-size: 16px; }

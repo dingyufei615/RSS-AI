@@ -237,6 +237,49 @@ async function manualFetch() {
   }
 }
 
+async function clearArticlesByFeed() {
+  const feed = (state.filterFeed || '').trim();
+  if (!feed) {
+    toast('请先在下拉框选择一个源');
+    return;
+  }
+  const confirmed = window.confirm(`确定清空当前源的文章吗？\n\n${feed}`);
+  if (!confirmed) {
+    return;
+  }
+  q('#statusText').textContent = '清理中…';
+  try {
+    const data = await api(`/api/articles?feed=${encodeURIComponent(feed)}`, { method: 'DELETE' });
+    state.page = 0;
+    await loadArticles();
+    toast(`已删除 ${data?.deleted ?? 0} 条`);
+  } catch (err) {
+    console.error(err);
+    toast(err.message || '清理失败');
+  } finally {
+    q('#statusText').textContent = '';
+  }
+}
+
+async function clearAllArticles() {
+  const confirmed = window.confirm('确定清空全部文章吗？该操作不可恢复。');
+  if (!confirmed) {
+    return;
+  }
+  q('#statusText').textContent = '清理中…';
+  try {
+    const data = await api('/api/articles', { method: 'DELETE' });
+    state.page = 0;
+    await loadArticles();
+    toast(`已删除 ${data?.deleted ?? 0} 条`);
+  } catch (err) {
+    console.error(err);
+    toast(err.message || '清理失败');
+  } finally {
+    q('#statusText').textContent = '';
+  }
+}
+
 async function loadSettings() {
   const s = await api('/api/settings');
   state.settings = s;
@@ -665,6 +708,14 @@ async function handlePushConfirm() {
 
 function bindEvents() {
   q('#refreshBtn').addEventListener('click', manualFetch);
+  const clearCurrentFeedBtn = q('#clearCurrentFeedBtn');
+  if (clearCurrentFeedBtn) {
+    clearCurrentFeedBtn.addEventListener('click', clearArticlesByFeed);
+  }
+  const clearAllArticlesBtn = q('#clearAllArticlesBtn');
+  if (clearAllArticlesBtn) {
+    clearAllArticlesBtn.addEventListener('click', clearAllArticles);
+  }
   q('#feedSelect').addEventListener('change', (e)=>{ state.filterFeed=e.target.value; state.page=0; loadArticles(); });
   const searchInput = q('#searchInput');
   const searchBtn = q('#searchBtn');
