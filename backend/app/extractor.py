@@ -16,6 +16,13 @@ NEGATIVE_HINTS = re.compile(
     r"nav|footer|header|aside|sidebar|advert|ads|promo|breadcrumb|popup|modal|subscribe|comment|share|related|tagcloud|login|signup",
     re.I,
 )
+LOW_QUALITY_PHRASES = [
+    "sorry, something went wrong",
+    "there was an error while loading",
+    "please reload this page",
+    "uh oh!",
+    "loading took too long",
+]
 
 
 def fetch_html(url: str, timeout: float = 15.0) -> Optional[str]:
@@ -109,6 +116,31 @@ def extract_main_text(html: str) -> str:
     return text.strip()
 
 
+def _looks_like_placeholder_text(text: str) -> bool:
+    if not text:
+        return True
+    normalized = re.sub(r"\s+", " ", text).strip().lower()
+    if not normalized:
+        return True
+
+    phrase_hits = 0
+    phrase_count = 0
+    for phrase in LOW_QUALITY_PHRASES:
+        c = normalized.count(phrase)
+        if c > 0:
+            phrase_hits += 1
+            phrase_count += c
+    if phrase_hits >= 2 or phrase_count >= 3:
+        return True
+
+    sentences = [s.strip() for s in re.split(r"[.!?。！？]+", normalized) if s.strip()]
+    if len(sentences) >= 4:
+        unique_ratio = len(set(sentences)) / len(sentences)
+        if unique_ratio < 0.55 and len(normalized) < 2000:
+            return True
+    return False
+
+
 def extract_from_url(url: str, timeout: float = 15.0) -> Optional[str]:
     html = fetch_html(url, timeout=timeout)
     if not html:
@@ -116,8 +148,10 @@ def extract_from_url(url: str, timeout: float = 15.0) -> Optional[str]:
     try:
         text = extract_main_text(html)
         if text and len(text) > 80:
+            if _looks_like_placeholder_text(text):
+                logging.info(f"抽取文本疑似占位错误文案，回退RSS内容: {url}")
+                return None
             return text
     except Exception as e:
         logging.warning(f"正文抽取失败 {url}: {e}")
     return None
-
