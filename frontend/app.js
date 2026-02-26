@@ -325,6 +325,7 @@ async function loadSettings() {
   q('#perFeedLimit').value = s.fetch.per_feed_limit ?? 20;
   q('#feeds').value = (s.fetch.feeds || []).join('\n');
   q('#filterKeywords').value = state.filterKeywords.join('\n');
+  q('#stableReleaseOnlyFeeds').value = (s.fetch.stable_release_only_feeds || []).join('\n');
   q('#useArticlePage').checked = !!s.fetch.use_article_page;
   q('#articleTimeout').value = s.fetch.article_timeout_seconds ?? 15;
   q('#doNotDisturb').value = s.fetch.do_not_disturb || '';
@@ -383,6 +384,7 @@ function gatherSettingsFromForm() {
   const current = state.settings;
   const feeds = q('#feeds').value.split(/\n+/).map(s => s.trim()).filter(Boolean);
   const filterKeywords = q('#filterKeywords').value.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const stableReleaseOnlyFeeds = q('#stableReleaseOnlyFeeds').value.split(/\n+/).map(s => s.trim()).filter(Boolean);
   const wecomFeedWebhooksParsed = parseWeComFeedWebhooks(q('#wecomFeedWebhooks')?.value || '');
   if (wecomFeedWebhooksParsed.invalidLines.length) {
     throw new Error(`企业微信按源机器人格式错误，行号：${wecomFeedWebhooksParsed.invalidLines.join(', ')}（格式：feed_url|webhook_key）`);
@@ -407,6 +409,7 @@ function gatherSettingsFromForm() {
       per_feed_limit: parseInt(q('#perFeedLimit').value, 10),
       feeds,
       filter_keywords: filterKeywords,
+      stable_release_only_feeds: stableReleaseOnlyFeeds,
       use_article_page: q('#useArticlePage').checked,
       article_timeout_seconds: parseInt(q('#articleTimeout').value, 10),
       do_not_disturb: q('#doNotDisturb').value.trim() || null,

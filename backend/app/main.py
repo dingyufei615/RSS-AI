@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone, time
 from typing import Dict, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
@@ -59,6 +60,8 @@ app.add_middleware(
 
 _scheduler: Optional[FetchScheduler] = None
 _report_schedulers: Dict[str, AlignedScheduler] = {}
+_RELEASE_VERSION_RE = re.compile(r"\bv(\d+)\.(\d+)\.(\d+)\b", re.I)
+_PRE_RELEASE_HINTS = ("nightly", "preview", "alpha", "beta", "rc", "canary", "pre-release", "prerelease")
 
 
 def _setup_logging():
@@ -337,6 +340,26 @@ def _is_do_not_disturb_time(settings: AppSettings) -> bool:
         return False
 
 
+def _is_stable_major_minor_release(title: str) -> bool:
+    text = (title or "").strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(hint in lowered for hint in _PRE_RELEASE_HINTS):
+        return False
+    match = _RELEASE_VERSION_RE.search(lowered)
+    if not match:
+        return False
+    patch = int(match.group(3))
+    if patch != 0:
+        return False
+    # 例如 v0.31.0-preview.0，版本号后直接带后缀，也判定为非正式版
+    end = match.end()
+    if end < len(lowered) and lowered[end] in "-_":
+        return False
+    return True
+
+
 def do_fetch_once(force: bool = False) -> FetchResponse:
     settings = load_settings()
 
@@ -383,12 +406,20 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
     feed_fetch_failed = 0
     raw_keywords = getattr(settings.fetch, "filter_keywords", []) or []
     filter_keywords = [kw.strip() for kw in raw_keywords if isinstance(kw, str) and kw.strip()]
+    raw_stable_feeds = getattr(settings.fetch, "stable_release_only_feeds", []) or []
+    stable_release_only_feeds = {
+        str(feed_url).strip()
+        for feed_url in raw_stable_feeds
+        if str(feed_url).strip()
+    }
     keyword_terms = list(filter_keywords)
     keyword_match_hits = 0
     keyword_match_articles = 0
+    stable_release_skipped = 0
     for feed in settings.fetch.feeds:
         logging.info(f"开始抓取: {feed}")
         wecom_for_feed = _build_wecom_client_for_feed(settings, feed, wecom_clients_by_key)
+        enforce_stable_release_only = feed in stable_release_only_feeds
         try:
             entries = fetch_feed(feed)
         except Exception as e:
@@ -408,6 +439,10 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
                 entries = entries[:limit]
         dup = 0
         for e in entries:
+            if enforce_stable_release_only and not _is_stable_major_minor_release(e.title):
+                stable_release_skipped += 1
+                logging.info("跳过非正式/补丁版本: feed=%s title=%s", feed, e.title)
+                continue
             processed += 1
             if not force and exists_article(feed, e.uid):
                 dup += 1
@@ -531,6 +566,8 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
             summary_lines.append(
                 f"关键词匹配：{keyword_match_hits} 次，命中文章：{keyword_match_articles} 篇"
             )
+        if stable_release_skipped:
+            summary_lines.append(f"版本过滤跳过：{stable_release_skipped} 条")
         if feed_fetch_failed:
             summary_lines.append(f"源抓取失败：{feed_fetch_failed} 个源")
         tg.send_message(settings.telegram.chat_id, "\n".join(summary_lines), parse_mode="HTML", disable_web_page_preview=True)
@@ -554,6 +591,8 @@ def do_fetch_once(force: bool = False) -> FetchResponse:
             summary_lines.append(
                 f"关键词匹配：{keyword_match_hits} 次，命中文章：{keyword_match_articles} 篇"
             )
+        if stable_release_skipped:
+            summary_lines.append(f"版本过滤跳过：{stable_release_skipped} 条")
         if feed_fetch_failed:
             summary_lines.append(f"源抓取失败：{feed_fetch_failed} 个源")
         wecom.send_message("\n".join(summary_lines))

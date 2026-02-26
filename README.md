@@ -187,6 +187,8 @@ fetch:
   filter_keywords:       # 关键词列表，命中后才会入库/推送，可留空；英文匹配区分大小写
     - 人工智能
     - Generative AI
+  stable_release_only_feeds:  # 可选：仅处理正式大版本发布（vX.Y.0）
+    - https://github.com/google-gemini/gemini-cli/releases.atom
   use_article_page: true # 抓取原文网页并抽取正文后再送AI
   article_timeout_seconds: 15  # 原文抓取超时时间（秒），范围 5-60
   per_feed_limit: 20     # 单个RSS源每次抓取的最大条数（按时间倒序优先），范围 1-1000
@@ -249,6 +251,7 @@ logging:
 - `telegram.push_mode` 控制推送范围：`all` 为发送文章和定时汇总，`article_only` 仅推送文章，`report_only` 仅推送定时汇总。
 - `telegram.push_summary` 控制抓取流程结束后是否推送统计汇总消息。
 - `telegram.fetch_summary_enabled` 控制是否推送抓取汇总统计消息。
+- `fetch.stable_release_only_feeds` 可用于 Release 类源的版本过滤：仅保留 `vX.Y.0`，自动跳过 nightly/preview/alpha/beta/rc/canary 和补丁版（如 `v0.29.7`）。
 - `wecom.push_mode` 控制企业微信推送范围：`all` 为发送文章和定时汇总，`article_only` 仅推送文章，`report_only` 仅推送定时汇总。
 - `wecom.push_summary` 控制抓取流程结束后是否推送统计汇总消息。
 - `wecom.fetch_summary_enabled` 控制是否推送抓取汇总统计消息。

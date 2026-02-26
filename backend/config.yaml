@@ -19,6 +19,7 @@ fetch:
   use_article_page: true
   article_timeout_seconds: 15
   per_feed_limit: 5
+  do_not_disturb: null
 ai:
   enabled: true
   base_url: https://api.openai.com/v1
@@ -52,14 +53,17 @@ telegram:
   chat_id: "@your_channel_or_chat_id"
   push_mode: all
   push_summary: true
+  fetch_summary_enabled: true
 wecom:
   enabled: false
   webhook_key: "YOUR_WECOM_WEBHOOK_KEY"
   push_mode: all
   push_summary: true
+  fetch_summary_enabled: true
 reports:
   daily_enabled: true
   hourly_enabled: true
+  daily_report_time: "00:00"
   report_timeout_seconds: 60
   system_prompt: '你是一名资深中文资讯编辑，需要汇总给定时间范围内的RSS内容。 请输出结构化的纯文本报告，包含以下部分： 1. 概览：先给出文章总量，然后总结整体趋势、领域，一句话一行。
     2. 重点事件：列出2-6条最值得关注的资讯，每条1-2句话，每条标上序号。 3. 一般事件：列出除重点事件外的资讯（重要的/影响越重大的）汇总成2-10条，每条1-2句话，其中

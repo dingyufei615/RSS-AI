@@ -94,6 +94,10 @@
               关键词筛选（每行一个，留空表示不过滤）
               <textarea id="filterKeywords" rows="4" placeholder="例如：科技\n芯片"></textarea>
             </label>
+            <label>
+              仅处理正式大版本发布的源（每行一个 feed URL，仅保留 vX.Y.0）
+              <textarea id="stableReleaseOnlyFeeds" rows="4" placeholder="https://github.com/google-gemini/gemini-cli/releases.atom"></textarea>
+            </label>
             <label class="switch">
               <input type="checkbox" id="useArticlePage" />
               <span>使用原文抽取正文</span>

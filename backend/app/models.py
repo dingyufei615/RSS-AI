@@ -13,6 +13,8 @@ class SettingsFetch(BaseModel):
     max_items: int = Field(500, ge=10, le=50000)
     feeds: List[str] = Field(default_factory=list)
     filter_keywords: List[str] = Field(default_factory=list)
+    # 仅处理正式大版本发布（vX.Y.0）的源列表，非正式版与补丁版将被跳过
+    stable_release_only_feeds: List[str] = Field(default_factory=list)
     use_article_page: bool = True
     article_timeout_seconds: int = Field(15, ge=5, le=60)
     per_feed_limit: int = Field(20, ge=1, le=1000)
